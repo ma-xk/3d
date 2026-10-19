@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>scan-to-3mf</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/style.css">
+  <script type="module" src="/static/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"></span>
+      <span class="brand-name">scan-to-3mf</span>
+      <span class="version" id="version"></span>
+    </div>
+    <div class="tagline">Scan mesh in, printable 3MF out. Files never leave this computer.</div>
+    <div class="chip" id="slicer-chip">Looking for a slicer…</div>
+  </header>
+
+  <main class="layout">
+    <aside class="panel">
+      <section class="card" aria-labelledby="step-file">
+        <h2 id="step-file"><span class="step">1</span> Scan mesh</h2>
+        <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Drop a scan mesh here or choose a file">
+          <div class="drop-icon" aria-hidden="true"></div>
+          <div class="drop-title">Drop a scan mesh here</div>
+          <div class="drop-sub">STL, OBJ, PLY, or 3MF</div>
+          <button type="button" class="btn secondary" id="choose">Choose a file…</button>
+          <input type="file" id="file" accept=".stl,.obj,.ply,.3mf" hidden>
+        </div>
+        <div id="file-info" class="file-info" hidden>
+          <div class="file-name" id="file-name"></div>
+          <div class="file-meta" id="file-meta"></div>
+          <ul class="notes" id="file-notes"></ul>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="step-units">
+        <h2 id="step-units"><span class="step">2</span> Units</h2>
+        <label class="field" id="unit-field">
+          <span id="unit-label">The file’s numbers are in</span>
+          <select id="unit" disabled></select>
+        </label>
+        <div id="unit-file-note" class="note" hidden></div>
+        <label class="check" id="override-wrap" hidden>
+          <input type="checkbox" id="override-unit">
+          <span>Ignore the unit declared in the 3MF</span>
+        </label>
+        <div class="size-readout">
+          <div class="size-label">Resulting size</div>
+          <div class="size-value" id="size-mm">—</div>
+          <div class="size-alt" id="size-in"></div>
+        </div>
+        <div id="unit-hint" class="hint" hidden></div>
+      </section>
+
+      <section class="card" aria-labelledby="step-clean">
+        <h2 id="step-clean"><span class="step">3</span> Cleaning</h2>
+        <p class="always">Always: weld duplicate vertices, drop degenerate and duplicate triangles, repair non-manifold edges and vertices, make normals consistent and outward. Scale only changes through the unit.</p>
+        <label class="check">
+          <input type="checkbox" id="opt-shells" checked>
+          <span>Remove floating shells under <input type="number" class="num" id="opt-shell-pct" value="1" min="0" max="50" step="0.5" aria-label="shell size percent"> % of the main shell’s triangles</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="opt-holes" checked>
+          <span>Fill holes up to <input type="number" class="num" id="opt-hole-mm" value="10" min="0" step="1" aria-label="largest hole to fill in mm"> mm across</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="opt-large">
+          <span>Also fill larger holes <span class="muted">(invents surface)</span></span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="opt-decimate">
+          <span>Reduce to <input type="number" class="num wide" id="opt-target" value="200000" min="1000" step="1000" aria-label="target triangle count"> triangles</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="opt-bed">
+          <span>Place on bed (lowest point at z = 0)</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="opt-slice" checked>
+          <span>Slice test with <span id="slicer-name">a slicer</span></span>
+        </label>
+        <button type="button" class="btn primary block" id="clean" disabled>Clean and build 3MF</button>
+        <div id="progress" class="progress" hidden>
+          <div class="bar"><div class="fill" id="progress-fill"></div></div>
+          <div class="progress-text" id="progress-text"></div>
+        </div>
+      </section>
+
+      <section class="card result" id="result-card" hidden>
+        <div id="verdict" class="verdict"></div>
+        <a class="btn primary block" id="download" href="#">Download 3MF</a>
+        <div class="result-links">
+          <a class="link" id="download-report" href="#">Report (JSON)</a>
+          <span class="muted small" id="output-meta"></span>
+        </div>
+        <div class="stale" id="stale" hidden>Settings changed since this 3MF was built. Clean again to apply them.</div>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <div class="card viewer-card">
+        <div class="viewer-head">
+          <h2>Preview</h2>
+          <div class="legend">
+            <span><i class="sw rim"></i>open edges (holes)</span>
+            <span><i class="sw nm"></i>non-manifold edges</span>
+            <span><i class="sw back"></i>inside / back faces</span>
+          </div>
+          <div class="viewer-tools">
+            <label class="check small"><input type="checkbox" id="show-defects" checked><span>Show problems</span></label>
+            <button type="button" class="btn ghost small" id="reset-view">Reset view</button>
+          </div>
+        </div>
+        <div class="viewers">
+          <div class="pane" id="pane-before">
+            <div class="pane-label">Before</div>
+            <div class="pane-dims" id="dims-before"></div>
+            <div class="pane-empty" id="empty-before">Drop a scan to see it here</div>
+          </div>
+          <div class="pane" id="pane-after">
+            <div class="pane-label">After</div>
+            <div class="pane-dims" id="dims-after"></div>
+            <div class="pane-empty" id="empty-after">The cleaned mesh appears here</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card report-card" id="report-card" hidden>
+        <div class="report-grid">
+          <div>
+            <h2>Before / after</h2>
+            <table class="metrics" id="metrics">
+              <thead><tr><th scope="col"></th><th scope="col">Before</th><th scope="col">After</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="report-lists">
+            <h3>What changed</h3>
+            <ul class="changes" id="changes"><li class="muted">Run a clean to see what changes.</li></ul>
+            <h3>Still wrong</h3>
+            <ul class="issues" id="remaining"><li class="muted">—</li></ul>
+            <h3>Verification of the 3MF</h3>
+            <ul class="checks" id="checks"><li class="muted">—</li></ul>
+          </div>
+        </div>
+        <div class="details-row">
+          <details id="holes-details">
+            <summary>Holes <span class="count" id="holes-count"></span></summary>
+            <table class="small-table" id="holes-table"></table>
+          </details>
+          <details id="shells-details">
+            <summary>Removed shells <span class="count" id="shells-count"></span></summary>
+            <table class="small-table" id="shells-table"></table>
+          </details>
+          <details>
+            <summary>Not checked</summary>
+            <ul class="plain" id="not-checked"></ul>
+          </details>
+        </div>
+        <div class="muted small" id="timings"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="drag-overlay" class="drag-overlay" hidden><div>Drop to load the mesh</div></div>
+  <div id="toast" class="toast" role="alert" hidden></div>
+</body>
+</html>

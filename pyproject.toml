@@ -1,0 +1,50 @@
+[project]
+name = "scan-to-3mf"
+version = "0.1.0"
+description = "Turn a 3D-scan triangle mesh (STL, OBJ, PLY, 3MF) into a cleaned, verified, printable 3MF."
+readme = "README.md"
+requires-python = ">=3.12,<3.15"
+dependencies = [
+    "fastapi>=0.141.1",
+    "lib3mf>=2.5.0",
+    "manifold3d>=3.5.4",
+    "numpy>=2.5.3",
+    "pymeshlab>=2025.7.post1",
+    "scipy>=1.18.1",
+    "trimesh>=5.1.0",
+    "uvicorn>=0.54.0",
+]
+
+[project.scripts]
+scan-to-3mf = "scan_to_3mf.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.20,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "ruff>=0.14.0",
+]
+e2e = [
+    "playwright>=1.49.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not large'"
+markers = [
+    "scans: needs the public scans from scripts/download_scans.py (skipped if missing)",
+    "slicer: needs PrusaSlicer or OrcaSlicer (skipped if missing)",
+    "large: slow million-triangle runs; select with -m large",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501", "B008"]

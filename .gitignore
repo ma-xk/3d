@@ -1,0 +1,20 @@
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# Downloaded third-party scans and generated outputs (never commit these)
+data/scans/
+data/out/
+benchmarks/runs/
+*.gcode
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
